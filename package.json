@@ -1,0 +1,23 @@
+{
+  "name": "news-agent",
+  "version": "1.0.0",
+  "description": "AI-powered news aggregator using agent-browser. Scrapes top news sources, extracts articles, generates summaries with source citations.",
+  "main": "index.js",
+  "bin": {
+    "news-agent": "./bin/cli.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "fetch": "node index.js --fetch",
+    "summary": "node index.js --summary",
+    "setup": "npx agent-browser install"
+  },
+  "keywords": ["news", "agent-browser", "ai", "automation", "web-scraping", "summarizer"],
+  "license": "MIT",
+  "dependencies": {
+    "agent-browser": "latest"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
