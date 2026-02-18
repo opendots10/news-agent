@@ -1,7 +1,7 @@
 {
   "name": "news-agent",
-  "version": "1.0.0",
-  "description": "AI-powered news aggregator using agent-browser. Scrapes top news sources, extracts articles, generates summaries with source citations.",
+  "version": "2.0.0",
+  "description": "AI-powered news aggregator using agent-browser. Scrapes AI labs, tech news, YC startups, and AI community sources. Generates summaries with source citations.",
   "main": "index.js",
   "bin": {
     "news-agent": "./bin/cli.js"
@@ -9,10 +9,31 @@
   "scripts": {
     "start": "node index.js",
     "fetch": "node index.js --fetch",
-    "summary": "node index.js --summary",
-    "setup": "npx agent-browser install"
+    "news": "node index.js",
+    "news:ai": "node index.js --category=ai-labs",
+    "news:startups": "node index.js --category=startups",
+    "news:json": "node index.js --json",
+    "init": "node index.js --init",
+    "sources": "node index.js --sources",
+    "setup": "npx agent-browser install",
+    "setup:deps": "npx agent-browser install --with-deps"
   },
-  "keywords": ["news", "agent-browser", "ai", "automation", "web-scraping", "summarizer"],
+  "keywords": [
+    "news",
+    "agent-browser",
+    "ai",
+    "automation",
+    "web-scraping",
+    "summarizer",
+    "openai",
+    "anthropic",
+    "deepmind",
+    "hacker-news",
+    "ycombinator",
+    "startups",
+    "techcrunch"
+  ],
+  "author": "opendots10",
   "license": "MIT",
   "dependencies": {
     "agent-browser": "latest"
