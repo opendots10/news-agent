@@ -1,208 +1,377 @@
-# 📰 news-agent
+# 🤖 news-agent
 
-**AI-powered news aggregator using [agent-browser](https://github.com/vercel-labs/agent-browser).** Scrapes top news sources, extracts articles, and generates summaries with source citations — all from the command line.
+AI-powered news aggregator built with [agent-browser](https://github.com/vercel-labs/agent-browser). Scrapes **16 sources** across AI labs, tech news, YC startups, and AI community — then generates a clean Markdown digest with source citations.
 
-## How It Works
+## Default Sources
 
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐     ┌──────────────┐
-│  Fetch URLs  │────▶│  Scrape with  │────▶│  Deduplicate │────▶│   Generate   │
-│  (8 sources) │     │ agent-browser │     │  & Rank Top  │     │   Summary    │
-└─────────────┘     └──────────────┘     └─────────────┘     └──────────────┘
-```
+| Category | Sources |
+|----------|---------|
+| 🧠 **AI Labs & Research** | OpenAI Blog, Anthropic News, Google DeepMind, Google AI Blog, Meta AI Blog |
+| 📰 **AI & Tech News** | Hacker News, TechCrunch AI, The Verge AI, Ars Technica AI, VentureBeat AI |
+| 🚀 **Startups & YC** | Y Combinator Blog, YC Launch, TechCrunch Startups, Product Hunt |
+| 🤗 **AI Community** | Hugging Face Blog, MarkTechPost |
 
-1. **Fetches** headlines from 8+ major news sources (Hacker News, BBC, Reuters, TechCrunch, The Verge, CNN, Al Jazeera, Google News)
-2. **Scrapes** each source using `agent-browser` headless automation
-3. **Deduplicates** and ranks the top stories
-4. **Extracts** full article content (optional `--full` flag)
-5. **Generates** a clean Markdown summary with source citations
+All sources are customizable via `sources.json`.
 
-## Installation
+---
 
-```bash
-# Clone and install
-git clone https://github.com/opendots10/news-agent.git
-cd news-agent
-npm install
-
-# First time: download Chromium
-npm run setup
-```
+## Setup
 
 ### Prerequisites
 
-- Node.js 18+
-- Linux: system dependencies auto-installed with `npm run setup`
+- **Node.js** 18+ (or **Bun** / **Deno**)
+- **pnpm** (recommended) or npm/yarn
+
+### Install with pnpm
+
+```bash
+# Clone the repo
+git clone https://github.com/opendots10/news-agent.git
+cd news-agent
+
+# Install dependencies
+pnpm install
+
+# Download Chromium (first time only)
+pnpm run setup
+
+# On Linux, also install system dependencies:
+pnpm run setup:deps
+```
+
+### Install with npm
+
+```bash
+git clone https://github.com/opendots10/news-agent.git
+cd news-agent
+npm install
+npm run setup
+```
+
+### Install with yarn
+
+```bash
+git clone https://github.com/opendots10/news-agent.git
+cd news-agent
+yarn install
+yarn setup
+```
+
+---
 
 ## Usage
 
 ### Quick Start
 
 ```bash
-# Fetch top 10 news with summaries
-node index.js
+# Fetch all AI & startup news (16 sources)
+pnpm start
 
-# Or via npm
-npm start
+# Or directly
+node index.js
 ```
 
-### Options
+### Commands
 
 ```bash
-# Fetch headlines only (no summaries)
-node index.js --fetch
+# Fetch everything
+pnpm start
 
-# Generate summary from cached headlines
-node index.js --summary
+# Only AI lab news (OpenAI, Anthropic, DeepMind, Google AI, Meta AI)
+pnpm run news:ai
 
-# Extract full article content for richer summaries
-node index.js --full
+# Only startup news (YC, Product Hunt, TechCrunch Startups)
+pnpm run news:startups
 
 # Output as JSON
-node index.js --json
+pnpm run news:json
 
-# Custom top N (default: 10)
-node index.js --top=20
+# Show configured sources
+pnpm run sources
 
-# Combine options
-node index.js --full --top=15 --json
+# Generate sources.json for customization
+pnpm run init
 ```
 
-### Output
+### CLI Options
+
+```bash
+node index.js [options]
+
+Options:
+  --fetch              Fetch headlines only (skip Markdown generation)
+  --json               Output as JSON instead of Markdown
+  --top=N              Limit to top N articles
+  --category=CAT       Filter by category:
+                         ai-labs, ai-news, startups, ai-community
+  --sources            Print all configured sources
+  --init               Generate sources.json from defaults
+  --help               Show help
+```
+
+### Examples
+
+```bash
+# Top 20 articles from all sources
+node index.js --top=20
+
+# Only AI lab announcements as JSON
+node index.js --category=ai-labs --json
+
+# Startup news, top 10
+node index.js --category=startups --top=10
+
+# Quick fetch (headlines only, no Markdown)
+node index.js --fetch
+```
+
+---
+
+## Customizing Sources
+
+Generate a `sources.json` config file:
+
+```bash
+pnpm run init
+# or: node index.js --init
+```
+
+This creates `sources.json` with all default sources. Edit it to add, remove, or modify sources:
+
+```json
+[
+  {
+    "name": "OpenAI Blog",
+    "url": "https://openai.com/blog",
+    "selector": "h3, h2",
+    "category": "ai-labs"
+  },
+  {
+    "name": "My Custom Source",
+    "url": "https://example.com/news",
+    "selector": "h2, h3, .article-title",
+    "category": "ai-news"
+  }
+]
+```
+
+### Source Schema
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Display name (used in citations) |
+| `url` | string | URL to scrape |
+| `selector` | string | CSS selector for headline elements |
+| `category` | string | Grouping key: `ai-labs`, `ai-news`, `startups`, `ai-community`, or custom |
+
+### Adding a New Source
+
+1. Open the site in your browser
+2. Inspect the headline elements (right-click → Inspect)
+3. Find the CSS selector (usually `h2`, `h3`, or a class like `.post-title`)
+4. Add it to `sources.json`
+
+```json
+{
+  "name": "MIT Technology Review",
+  "url": "https://www.technologyreview.com/topic/artificial-intelligence/",
+  "selector": "h3",
+  "category": "ai-news"
+}
+```
+
+---
+
+## Output
 
 Results are saved to the `output/` directory:
 
 ```
 output/
-├── headlines-2026-02-18.json   # Raw headlines from all sources
-├── news-2026-02-18.json        # Top articles with metadata
-└── news-2026-02-18.md          # Formatted Markdown summary
+├── ai-news-2026-02-18.json   # Raw article data
+└── ai-news-2026-02-18.md     # Formatted Markdown digest
 ```
 
-### Example Output
+### Sample Output
 
 ```markdown
-# 📰 Top 10 News Stories — 2026-02-18
+# 🤖 AI & Startup News — 2026-02-18
 
-> Auto-generated by news-agent using agent-browser
-
----
-
-## 1. OpenAI Announces GPT-5 with Real-Time Reasoning
-
-OpenAI unveiled GPT-5 today with significant improvements in reasoning capabilities.
-The model demonstrates near-human performance on complex multi-step problems.
-
-**Source:** [TechCrunch](https://techcrunch.com/2026/02/18/openai-gpt5)
+> Auto-generated by news-agent
+> 93 articles from 14 sources
 
 ---
 
-## 2. Global Markets Rally on Economic Data
+## 🧠 AI Labs & Research
 
-Markets surged across Asia, Europe, and the US following positive economic indicators.
+1. **[Anthropic releases Sonnet 4.6](https://anthropic.com/news/sonnet-4-6)**
+   *Source: Anthropic News*
 
-**Source:** [Reuters](https://reuters.com/markets/rally-2026)
+2. **[OpenAI sidesteps Nvidia with coding model on plate-sized chips](https://openai.com/blog/...)**
+   *Source: OpenAI Blog*
+
+## 📰 AI & Tech News
+
+1. **[Mistral AI buys Koyeb in first acquisition](https://techcrunch.com/...)**
+   *Source: TechCrunch AI*
+
+## 🚀 Startups & YC
+
+1. **[India's vibe-coding startup claims $100M ARR in 8 months](https://techcrunch.com/...)**
+   *Source: TechCrunch Startups*
 
 ---
 
-## Sources
-- [TechCrunch](https://techcrunch.com)
-- [Reuters](https://reuters.com)
-- [Hacker News](https://news.ycombinator.com)
+## 📋 All Sources
+- [OpenAI Blog](https://openai.com/blog)
+- [Anthropic News](https://www.anthropic.com/news)
+- ...
 ```
 
-## Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `AGENT_BROWSER_OPTS` | Extra flags for agent-browser | `--ignore-https-errors` |
-| `TMPDIR` | Temp directory for browser | `/tmp` |
-
-### Adding News Sources
-
-Edit the `NEWS_SOURCES` array in `index.js`:
-
-```javascript
-const NEWS_SOURCES = [
-  { name: "Source Name", url: "https://example.com", selector: "h3" },
-  // ...
-];
-```
-
-- `name`: Display name for citations
-- `url`: Homepage or section URL to scrape
-- `selector`: CSS selector for headline elements (usually `h2`, `h3`, or article link selectors)
-
-## How agent-browser Powers This
-
-This project uses [agent-browser](https://github.com/vercel-labs/agent-browser) — a fast Rust CLI for headless browser automation designed for AI agents.
-
-Key commands used:
-- `agent-browser open <url>` — Navigate to news sources
-- `agent-browser eval <js>` — Extract headlines and article content via JavaScript
-- `agent-browser snapshot` — Fallback: get accessibility tree for structured data
-- `agent-browser close` — Clean up browser instance
-
-agent-browser handles all the complexity of:
-- Headless Chromium management
-- JavaScript rendering (essential for modern news sites)
-- HTTPS certificate handling
-- Session management
+---
 
 ## Automation
 
-### Cron Job (Daily News)
+### Cron Job (Daily Digest)
 
 ```bash
-# Add to crontab: fetch news every morning at 8am
-0 8 * * * cd /path/to/news-agent && node index.js --full >> /var/log/news-agent.log 2>&1
+# Fetch AI news every morning at 8am UTC
+0 8 * * * cd /path/to/news-agent && node index.js >> output/cron.log 2>&1
 ```
 
 ### GitHub Actions
 
 ```yaml
-name: Daily News Digest
+name: Daily AI News Digest
 on:
   schedule:
-    - cron: '0 8 * * *'
-  workflow_dispatch:
+    - cron: '0 8 * * *'   # 8am UTC daily
+  workflow_dispatch:        # Manual trigger
 
 jobs:
   fetch-news:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install
-      - run: npx agent-browser install --with-deps
-      - run: node index.js --full
+          cache: 'pnpm'
+
+      - run: pnpm install
+      - run: pnpm run setup:deps
+      - run: node index.js
+
+      - name: Commit digest
+        run: |
+          git config user.name "news-agent"
+          git config user.email "bot@users.noreply.github.com"
+          git add output/
+          git diff --cached --quiet || git commit -m "📰 News digest $(date +%Y-%m-%d)"
+          git push
+
       - uses: actions/upload-artifact@v4
         with:
-          name: news-digest
+          name: news-digest-${{ github.run_number }}
           path: output/
 ```
+
+### Docker
+
+```dockerfile
+FROM node:20-slim
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN apt-get update && apt-get install -y wget gnupg
+
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install
+RUN npx agent-browser install --with-deps
+
+COPY . .
+CMD ["node", "index.js"]
+```
+
+```bash
+docker build -t news-agent .
+docker run --rm -v $(pwd)/output:/app/output news-agent
+```
+
+---
+
+## How It Works
+
+```
+┌──────────────┐    ┌───────────────┐    ┌─────────────┐    ┌──────────────┐
+│ Load sources │───▶│ agent-browser │───▶│ Deduplicate │───▶│   Generate   │
+│ (16 default  │    │ scrape each   │    │  & group by  │    │   Markdown   │
+│  or custom)  │    │ site via JS   │    │  category    │    │   digest     │
+└──────────────┘    └───────────────┘    └─────────────┘    └──────────────┘
+```
+
+1. **Load sources** from `sources.json` (or built-in defaults)
+2. **Navigate** to each source with `agent-browser open`
+3. **Extract headlines** via `agent-browser eval` (JS) with snapshot fallback
+4. **Deduplicate** by title similarity
+5. **Group by category** and generate Markdown with citations
+
+---
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `AGENT_BROWSER_OPTS` | Extra flags for agent-browser | `--ignore-https-errors` |
+| `TMPDIR` | Temp directory | `/tmp` |
+| `XDG_RUNTIME_DIR` | Runtime directory | `/tmp` |
+
+---
 
 ## Project Structure
 
 ```
 news-agent/
-├── index.js          # Main pipeline (fetch → scrape → summarize)
+├── index.js          # Main pipeline (fetch → scrape → dedupe → summarize)
 ├── bin/cli.js        # CLI entry point
-├── package.json
-├── README.md
+├── package.json      # Dependencies & scripts
+├── sources.json      # Custom sources (created with --init)
+├── output/           # Generated digests (gitignored)
+│   ├── ai-news-YYYY-MM-DD.md
+│   └── ai-news-YYYY-MM-DD.json
+├── .gitignore
 ├── LICENSE
-└── output/           # Generated news digests (gitignored)
+└── README.md
 ```
+
+---
+
+## Tech Stack
+
+- **[agent-browser](https://github.com/vercel-labs/agent-browser)** — Headless browser automation (Rust CLI + Playwright)
+- **Node.js** — Runtime
+- **pnpm** — Package manager (recommended)
+
+---
+
+## Contributing
+
+1. Fork the repo
+2. Add your source to `sources.json`
+3. Test with `node index.js --category=your-category`
+4. Submit a PR
+
+---
 
 ## License
 
-MIT
+MIT — See [LICENSE](LICENSE)
 
 ## Credits
 
-- Built with [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel Labs
-- News sources: Hacker News, BBC, Reuters, TechCrunch, The Verge, CNN, Al Jazeera, Google News
+Built with [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel Labs.
