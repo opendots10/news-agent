@@ -1,0 +1,171 @@
+#!/usr/bin/env node
+
+const { execSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+
+const OUTPUT_DIR = path.join(process.cwd(), "output");
+const TMPDIR_ENV = { TMPDIR: "/tmp", XDG_RUNTIME_DIR: "/tmp", ...process.env };
+
+function ab(cmd) {
+  try {
+    return execSync(`npx agent-browser --ignore-https-errors ${cmd}`, {
+      env: TMPDIR_ENV, timeout: 45_000, encoding: "utf-8"
+    }).replace(/npm notice[^\n]*/g, "").replace(/⚠[^\n]*/g, "").trim();
+  } catch (e) {
+    return e.stdout?.replace(/npm notice[^\n]*/g, "").trim() || "";
+  }
+}
+
+function sleep(ms) { execSync(`sleep ${ms / 1000}`); }
+
+const AI_SOURCES = [
+  // AI Labs & Research
+  { name: "OpenAI Blog",          url: "https://openai.com/blog",                    selector: "h3, h2, [class*='title']" },
+  { name: "Anthropic News",       url: "https://www.anthropic.com/news",             selector: "h3, h2, [class*='title']" },
+  { name: "Google DeepMind",      url: "https://deepmind.google/discover/blog/",     selector: "h3, h2" },
+  { name: "Google AI Blog",       url: "https://blog.google/technology/ai/",         selector: "h3, h2" },
+  { name: "Meta AI Blog",         url: "https://ai.meta.com/blog/",                  selector: "h3, h2, [class*='title']" },
+
+  // Tech/AI News
+  { name: "Hacker News",          url: "https://news.ycombinator.com",               selector: ".titleline > a" },
+  { name: "TechCrunch AI",        url: "https://techcrunch.com/category/artificial-intelligence/", selector: "h3, h2" },
+  { name: "The Verge AI",         url: "https://www.theverge.com/ai-artificial-intelligence", selector: "h2, h3" },
+  { name: "Ars Technica AI",      url: "https://arstechnica.com/ai/",                selector: "h2" },
+  { name: "VentureBeat AI",       url: "https://venturebeat.com/category/ai/",       selector: "h2, h3" },
+
+  // Startups & YC
+  { name: "Y Combinator News",    url: "https://www.ycombinator.com/blog",           selector: "h3, h2, [class*='title']" },
+  { name: "YC Launch",            url: "https://www.ycombinator.com/launches",       selector: "h3, h2, [class*='title']" },
+  { name: "TechCrunch Startups",  url: "https://techcrunch.com/category/startups/",  selector: "h3, h2" },
+  { name: "Product Hunt",         url: "https://www.producthunt.com",                selector: "h3, h2, [class*='name']" },
+
+  // AI Community
+  { name: "Hugging Face Blog",    url: "https://huggingface.co/blog",                selector: "h2, h3, article a" },
+  { name: "AI News (MarkTechPost)", url: "https://www.marktechpost.com",             selector: "h2, h3" },
+];
+
+async function run() {
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+
+  console.log("🤖 AI & Startup News Agent");
+  console.log("==========================");
+  console.log(`📡 Scanning ${AI_SOURCES.length} sources...\n`);
+
+  const allArticles = [];
+
+  for (const source of AI_SOURCES) {
+    console.log(`  → ${source.name}`);
+
+    try {
+      ab(`open "${source.url}"`);
+      sleep(4000);
+
+      // Try JS eval first
+      const js = `JSON.stringify(Array.from(document.querySelectorAll('${source.selector}')).slice(0,8).map(el=>{const link=el.closest('a')||el.querySelector('a')||el.parentElement?.closest('a');return{title:el.innerText.trim().substring(0,200),url:link?link.href:''}}).filter(a=>a.title.length>10))`;
+
+      let result = ab(`eval "${js.replace(/"/g, '\\"')}"`);
+      let articles = [];
+
+      try {
+        articles = JSON.parse(result.replace(/^"|"$/g, ""));
+      } catch {
+        // Fallback: snapshot
+        const snapshot = ab("snapshot -i -c -d 3");
+        const lines = snapshot.split("\n").filter(l => l.includes("link") || l.includes("heading"));
+        articles = lines
+          .map(l => {
+            const titleMatch = l.match(/"([^"]{15,200})"/);
+            const urlMatch = l.match(/\/url:\s*(.+)/);
+            return titleMatch ? { title: titleMatch[1], url: urlMatch ? urlMatch[1].trim() : "" } : null;
+          })
+          .filter(Boolean)
+          .slice(0, 8);
+      }
+
+      for (const a of articles) {
+        if (a.title && a.title.length > 10) {
+          allArticles.push({
+            source: source.name,
+            sourceUrl: source.url,
+            title: a.title.replace(/[\\r\n]+/g, " ").trim().slice(0, 200),
+            url: a.url || source.url,
+            fetchedAt: new Date().toISOString(),
+          });
+        }
+      }
+      console.log(`    ✓ ${articles.length} articles`);
+    } catch (err) {
+      console.log(`    ✗ Failed`);
+    }
+  }
+
+  // Deduplicate
+  const seen = new Set();
+  const unique = allArticles.filter(a => {
+    const key = a.title.toLowerCase().slice(0, 40);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  console.log(`\n📊 Total: ${allArticles.length} articles, ${unique.length} unique\n`);
+
+  // Generate markdown
+  const date = new Date().toISOString().split("T")[0];
+  const lines = [
+    `# 🤖 AI & Startup News — ${date}`,
+    "",
+    `> Auto-generated by [news-agent](https://github.com/opendots10/news-agent)`,
+    `> ${unique.length} articles from ${AI_SOURCES.length} sources | ${new Date().toISOString()}`,
+    "",
+    "---",
+    "",
+  ];
+
+  // Group by category
+  const categories = {
+    "🧠 AI Labs & Research": ["OpenAI Blog", "Anthropic News", "Google DeepMind", "Google AI Blog", "Meta AI Blog"],
+    "📰 AI News": ["Hacker News", "TechCrunch AI", "The Verge AI", "Ars Technica AI", "VentureBeat AI"],
+    "🚀 Startups & YC": ["Y Combinator News", "YC Launch", "TechCrunch Startups", "Product Hunt"],
+    "🤗 AI Community": ["Hugging Face Blog", "AI News (MarkTechPost)"],
+  };
+
+  for (const [cat, sources] of Object.entries(categories)) {
+    const catArticles = unique.filter(a => sources.includes(a.source));
+    if (catArticles.length === 0) continue;
+
+    lines.push(`## ${cat}`);
+    lines.push("");
+
+    catArticles.forEach((a, i) => {
+      const link = a.url && a.url !== a.sourceUrl ? `[${a.title}](${a.url})` : a.title;
+      lines.push(`${i + 1}. **${link}**`);
+      lines.push(`   *Source: ${a.source}*`);
+      lines.push("");
+    });
+
+    lines.push("---");
+    lines.push("");
+  }
+
+  lines.push("## 📋 All Sources");
+  lines.push("");
+  AI_SOURCES.forEach(s => lines.push(`- [${s.name}](${s.url})`));
+  lines.push("");
+  lines.push(`---`);
+  lines.push(`*Generated on ${new Date().toISOString()}*`);
+
+  const md = lines.join("\n");
+
+  fs.writeFileSync(path.join(OUTPUT_DIR, `ai-news-${date}.md`), md);
+  fs.writeFileSync(path.join(OUTPUT_DIR, `ai-news-${date}.json`), JSON.stringify(unique, null, 2));
+
+  console.log(md);
+  console.log(`\n💾 Saved to output/ai-news-${date}.md`);
+
+  ab("close");
+  console.log("\n✅ Done!");
+}
+
+run().catch(e => { console.error("Fatal:", e.message); process.exit(1); });
